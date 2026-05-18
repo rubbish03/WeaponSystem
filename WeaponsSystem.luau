@@ -2,7 +2,7 @@ local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- PRUEBA GITHUB
+--VIVA MEXICO Y VIVA LA VIRGEN DE GUADALUPE
 
 local IsServer = RunService:IsServer()
 
@@ -204,10 +204,10 @@ function WeaponsSystem.onCharacterAdded(character)
 		if isSeated then
 			WeaponsSystem.seatedWeapon = character:FindFirstChildOfClass("Tool")
 			humanoid:UnequipTools()
-			-- Lo dejamos en false (tu inventario ya lo apagó, pero por si las dudas)
+			-- Lo dejamos en false (tu inventario ya lo apagï¿½, pero por si las dudas)
 			WeaponsSystem.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 		else
-			-- ?? ¡EL FIX DEFINITIVO! Cambiado a FALSE para que la mochila nativa siga muerta ??
+			-- ?? ï¿½EL FIX DEFINITIVO! Cambiado a FALSE para que la mochila nativa siga muerta ??
 			WeaponsSystem.StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 
 			if WeaponsSystem.seatedWeapon then
@@ -255,8 +255,8 @@ end
 
 function WeaponsSystem.createWeaponForInstance(weaponInstance)
 	-- =========================================================
-	-- ??? ESCUDO ANTI-BÓVEDAS Y TIENDAS (Por Gemini)
-	-- Si el objeto está en ReplicatedStorage (Tiendas) o en ServerStorage (Base de Datos), lo ignoramos.
+	-- ??? ESCUDO ANTI-Bï¿½VEDAS Y TIENDAS (Por Gemini)
+	-- Si el objeto estï¿½ en ReplicatedStorage (Tiendas) o en ServerStorage (Base de Datos), lo ignoramos.
 	-- =========================================================
 	local inReplicated = weaponInstance:IsDescendantOf(game:GetService("ReplicatedStorage"))
 	local inServerStorage = weaponInstance:IsDescendantOf(game:GetService("ServerStorage"))
@@ -268,9 +268,9 @@ function WeaponsSystem.createWeaponForInstance(weaponInstance)
 
 	coroutine.wrap(function()
 		local weaponType = WeaponsSystem.getWeaponTypeFromTags(weaponInstance)
-		-- ... (El resto del código se queda igualito, con la vacuna de los 3 segundos)
+		-- ... (El resto del cï¿½digo se queda igualito, con la vacuna de los 3 segundos)
 		if not weaponType then
-			-- ?? VACUNA ANTI-CONGELAMIENTO: Espera MÁXIMO 3 segundos. Si no lo encuentra, no traba tu juego.
+			-- ?? VACUNA ANTI-CONGELAMIENTO: Espera Mï¿½XIMO 3 segundos. Si no lo encuentra, no traba tu juego.
 			local weaponTypeObj = weaponInstance:WaitForChild("WeaponType", 3)
 
 			if weaponTypeObj and weaponTypeObj:IsA("StringValue") then
@@ -291,7 +291,7 @@ function WeaponsSystem.createWeaponForInstance(weaponInstance)
 		-- Since we might have yielded while trying to get the WeaponType, we need to make sure not to continue
 		-- making a new weapon if something else beat this iteration.
 		if WeaponsSystem.getWeaponForInstance(weaponInstance) then
-			-- Quité los warns para no ensuciar tu consola
+			-- Quitï¿½ los warns para no ensuciar tu consola
 			return
 		end
 
@@ -444,7 +444,7 @@ end
 
 local function _defaultDamageCallback(system, target, amount, damageType, dealer, hitInfo, damageData)
 	if target:IsA("Humanoid") then
-		-- ?? INYECCIÓN PARA DEATHHANDLER ??
+		-- ?? INYECCIï¿½N PARA DEATHHANDLER ??
 		if dealer and dealer:IsA("Player") then
 			local creatorTag = target:FindFirstChild("creator")
 			if not creatorTag then
@@ -456,7 +456,7 @@ local function _defaultDamageCallback(system, target, amount, damageType, dealer
 			game:GetService("Debris"):AddItem(creatorTag, 4)
 		end
 
-		-- ?? HACK DE BALÍSTICA PARA ROBOTS CON FORCEFIELD ESTÉTICO ??
+		-- ?? HACK DE BALï¿½STICA PARA ROBOTS CON FORCEFIELD ESTï¿½TICO ??
 		-- Si el objetivo tiene nuestro ForceField falso, le bajamos la vida a la fuerza.
 		-- Si no lo tiene, usamos el TakeDamage normal (para respetar el Spawn de los jugadores reales).
 		if target.Parent:FindFirstChild("EscudoVisual") then
