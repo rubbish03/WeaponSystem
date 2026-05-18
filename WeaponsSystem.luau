@@ -2,7 +2,7 @@ local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
---VIVA MEXICO Y VIVA LA VIRGEN DE GUADALUPE
+--Jesus Rub
 
 local IsServer = RunService:IsServer()
 
