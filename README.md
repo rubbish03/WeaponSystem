@@ -10,6 +10,8 @@ Sistema de armas personalizado para Roblox basado en el WeaponsSystem, con mejor
 
 **Gestion dinamica de `WalkSpeed`:** Se modifico la forma en la que el sistema penaliza o altera la velocidad del jugador al equipar o apuntar un arma, integrando compatibilidad para respetar factores externos del juego, como los multiplicadores de velocidad cuando el jugador trae puesto un exoesqueleto.
 
+**Anti fuego aliado:** Se agrego una validacion de equipos antes de aplicar dano entre jugadores. Si dos jugadores estan en el mismo equipo, el disparo no aplica dano; si estan en equipos distintos, el dano se permite. Esto permite usar el mismo WeaponsSystem tanto para modos por equipo como para modos FFA donde el game loop asigna equipos separados.
+
 ### Mejoras en ShoulderCamera.luau (Camara)
 
 **Fix de agresividad en GUIs:** Se parcho el conflicto donde la camara se volvia inestable, se arrastraba o disparaba la sensibilidad cuando el jugador interactuaba con interfaces en pantalla. Ahora la camara cede el control limpiamente cuando el input cae sobre una GUI.

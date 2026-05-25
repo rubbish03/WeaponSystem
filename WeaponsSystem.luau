@@ -472,7 +472,14 @@ function WeaponsSystem.doDamage(target, amount, damageType, dealer, hitInfo, dam
 		return
 	end
 	if IsServer then
-		if target:IsA("Humanoid") and dealer:IsA("Player") and dealer.Character then
+		if target:IsA("Humanoid") and dealer and dealer:IsA("Player") then
+			local targetPlayer = Players:GetPlayerFromCharacter(target.Parent)
+			if targetPlayer and targetPlayer ~= dealer and not WeaponsSystem.playersOnDifferentTeams(dealer, targetPlayer) then
+				return
+			end
+		end
+
+		if target:IsA("Humanoid") and dealer and dealer:IsA("Player") and dealer.Character then
 			local dealerHumanoid = dealer.Character:FindFirstChildOfClass("Humanoid")
 			local targetPlayer = Players:GetPlayerFromCharacter(target.Parent)
 			if dealerHumanoid and target ~= dealerHumanoid and targetPlayer then
@@ -504,9 +511,13 @@ function WeaponsSystem.playersOnDifferentTeams(player1, player2)
 		return true
 	end
 
+	if player1.Team ~= nil or player2.Team ~= nil then
+		return player1.Team ~= nil and player2.Team ~= nil and player1.Team ~= player2.Team
+	end
+
 	local player1Team = WeaponsSystem.getTeam(player1)
 	local player2Team = WeaponsSystem.getTeam(player2)
-	return player1Team == 0 or player1Team ~= player2Team
+	return player1Team ~= player2Team
 end
 
 function WeaponsSystem:TriggerFire(isFiring)
