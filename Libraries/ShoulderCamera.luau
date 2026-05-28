@@ -616,9 +616,21 @@ function ShoulderCamera:releaseFullPose(dt)
 end
 
 function ShoulderCamera:lerpMotorToBase(motor, baseC0, alpha)
-	if motor and baseC0 then
-		motor.C0 = motor.C0:Lerp(baseC0, alpha)
+	if not motor or not baseC0 then
+		return
 	end
+
+	local canReadC0, currentC0 = pcall(function()
+		return motor.C0
+	end)
+	if not canReadC0 or typeof(currentC0) ~= "CFrame" then
+		return
+	end
+
+	local targetC0 = currentC0:Lerp(baseC0, alpha)
+	pcall(function()
+		motor.C0 = targetC0
+	end)
 end
 
 function ShoulderCamera:updateAimingWalkSpeed()
