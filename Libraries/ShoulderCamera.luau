@@ -221,6 +221,7 @@ function ShoulderCamera.new(weaponsSystem)
 	self.defaultWristC0 = nil
 	self.defaultRightShoulderC0 = nil
 	self.defaultLeftShoulderC0 = nil
+	self.rootJointC0ReadOnly = false
 	self.random = Random.new()
 
 	return self
@@ -607,7 +608,25 @@ function ShoulderCamera:applyRootJointFix()
 			rotationFix = self.rootJoint.Transform:inverse() * leadRotation * rotation:Lerp(CFrame.new(), 1 - rotationScale) + (self.rootJoint.Transform.Position * translationScale)
 		end
 
-		self.rootJoint.C0 = CFrame.new(self.rootJoint.C0.Position, self.rootJoint.C0.Position + rotationFix.LookVector.Unit)
+		if self.rootJointC0ReadOnly then
+			return
+		end
+
+		local canReadC0, currentC0 = pcall(function()
+			return self.rootJoint.C0
+		end)
+		if not canReadC0 or typeof(currentC0) ~= "CFrame" then
+			self.rootJointC0ReadOnly = true
+			return
+		end
+
+		local targetC0 = CFrame.new(currentC0.Position, currentC0.Position + rotationFix.LookVector.Unit)
+		local canWriteC0 = pcall(function()
+			self.rootJoint.C0 = targetC0
+		end)
+		if not canWriteC0 then
+			self.rootJointC0ReadOnly = true
+		end
 	end
 end
 
@@ -786,6 +805,7 @@ function ShoulderCamera:onCurrentCharacterChanged(character)
 		self.raycastIgnoreList[1] = self.currentCharacter
 		self.currentHumanoid = character:WaitForChild("Humanoid")
 		self.currentRootPart = character:WaitForChild("HumanoidRootPart")
+		self.rootJointC0ReadOnly = false
 
 		self.rootRigAttach = self.currentRootPart:WaitForChild("RootRigAttachment")
 		self.rootJoint = character:WaitForChild("LowerTorso"):WaitForChild("Root")
@@ -887,6 +907,7 @@ function ShoulderCamera:onCurrentCharacterChanged(character)
 		self.currentHumanoid = nil
 		self.currentRootPart = nil
 		self.rootJoint = nil
+		self.rootJointC0ReadOnly = false
 		self.defaultRootJointC0 = nil
 		self.currentWaist = nil
 		self.defaultWaistC0 = nil
