@@ -327,6 +327,12 @@ function ShoulderCamera:setCameraControlEnabled(enabled)
 			return
 		end
 
+		if not self.currentTool or not (self.weaponsSystem and self.weaponsSystem.currentWeapon) then
+			self:applyReleasedControlState()
+			self:updateZoomState()
+			return
+		end
+
 		if self.currentCamera then
 			local cameraLook = self.currentCamera.CFrame.lookVector
 			self.yaw = math.atan2(-cameraLook.X, -cameraLook.Z)
@@ -346,6 +352,15 @@ end
 
 function ShoulderCamera:applyReleasedControlState()
 	self.zoomedFromInput = false
+	self.forcedZoomed = false
+	self.zoomState = false
+	self.zoomAlpha = 0
+	self.lastOcclusionDistance = 0
+	self.lastOcclusionReachedTime = 0
+	self.timeLastPoppedWayIn = 0
+	self.lastSideCorrectionMagnitude = 0
+	self.lastSideCorrectionReachedTime = 0
+	self.desiredFieldOfView = self.fieldOfView
 	self.gamepadPan = Vector2.new(0, 0)
 	self.movementPan = Vector2.new(0, 0)
 	self.touchObj = nil
@@ -368,10 +383,12 @@ function ShoulderCamera:applyReleasedControlState()
 
 	if self.currentHumanoid then
 		self.currentHumanoid.AutoRotate = true
+		self.currentHumanoid.CameraOffset = Vector3.new(0, 0, 0)
 	end
 
 	if self.currentCamera then
 		self.currentCamera.CameraType = Enum.CameraType.Custom
+		self.currentCamera.FieldOfView = self.fieldOfView
 		if self.currentHumanoid then
 			self.currentCamera.CameraSubject = self.currentHumanoid
 		end
@@ -394,6 +411,11 @@ function ShoulderCamera:onRenderStep(dt)
 	if not self.cameraControlEnabled then
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
+		return
+	end
+
+	if not self.currentTool or not (self.weaponsSystem and self.weaponsSystem.currentWeapon) then
+		self:applyReleasedControlState()
 		return
 	end
 
@@ -893,7 +915,7 @@ function ShoulderCamera:onCurrentCameraChanged(camera)
 			self.eventConnections.cameraTypeChanged = nil
 		end
 		self.eventConnections.cameraTypeChanged = self.currentCamera:GetPropertyChangedSignal("CameraType"):Connect(function()
-			if self.enabled and self.cameraControlEnabled then
+			if self.enabled and self.cameraControlEnabled and self.currentTool and self.weaponsSystem and self.weaponsSystem.currentWeapon then
 				self.currentCamera.CameraType = Enum.CameraType.Scriptable
 			end
 		end)
