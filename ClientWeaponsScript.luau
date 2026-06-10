@@ -6,7 +6,7 @@ local replicatedStorageChildAddedConnection
 local clientWeaponsScript
 local weaponsSystemFolder
 
-local WeaponsSystem -- Referencia global al módulo
+local WeaponsSystem -- Referencia global al modulo
 
 local function setupWeaponsSystem()
 	WeaponsSystem = require(weaponsSystemFolder.WeaponsSystem)
@@ -15,28 +15,70 @@ local function setupWeaponsSystem()
 	end
 
 	-- =========================================================
-	-- ?? DOMADOR DE CÁMARA (Con Seguro Anti-Secuestro)
+	-- DOMADOR DE CAMARA (Con seguro anti-secuestro)
 	-- =========================================================
 	local player = Players.LocalPlayer
+
+	local function setWeaponGuiEnabled(enabled)
+		if not WeaponsSystem.gui then
+			return
+		end
+
+		if type(WeaponsSystem.gui.setEnabled) == "function" then
+			pcall(function()
+				WeaponsSystem.gui:setEnabled(enabled)
+			end)
+		else
+			WeaponsSystem.gui.Enabled = enabled
+		end
+
+		if not enabled then
+			if type(WeaponsSystem.gui.setCrosshairEnabled) == "function" then
+				pcall(function()
+					WeaponsSystem.gui:setCrosshairEnabled(false)
+				end)
+			end
+			if type(WeaponsSystem.gui.setScopeEnabled) == "function" then
+				pcall(function()
+					WeaponsSystem.gui:setScopeEnabled(false)
+				end)
+			end
+		end
+	end
+
+	local function forceDisableWeaponGui()
+		setWeaponGuiEnabled(false)
+		task.defer(function()
+			setWeaponGuiEnabled(false)
+		end)
+		task.delay(0.1, function()
+			setWeaponGuiEnabled(false)
+		end)
+	end
 
 	local function updateCamera()
 		local character = player.Character
 		local hasWeaponEquipped = false
+		local equippedTool = nil
 		local hum = nil
 
-		-- ?? CHEQUEO DE SECUESTRO: Si está secuestrado, bloqueamos todo pase lo que pase
+		-- CHEQUEO DE SECUESTRO: Si esta secuestrado, bloqueamos todo pase lo que pase.
 		local estaSecuestrado = player:GetAttribute("Secuestrado") == true
 
 		if character and not estaSecuestrado then
 			hum = character:FindFirstChildOfClass("Humanoid")
 			local tool = character:FindFirstChildOfClass("Tool")
-			-- Verificamos si lo que tiene en la mano es un arma de este sistema
+			-- Verificamos si lo que tiene en la mano es un arma de este sistema.
 			if tool and tool:FindFirstChild("WeaponType") then
 				hasWeaponEquipped = true
+				equippedTool = tool
 			end
 		end
 
-		-- Apagamos/Prendemos la cámara del sistema
+		local activeWeapon = WeaponsSystem.currentWeapon
+		local hasActiveWeapon = hasWeaponEquipped and activeWeapon ~= nil and activeWeapon.instance == equippedTool
+
+		-- Apagamos/Prendemos la camara del sistema segun el Tool equipado.
 		if WeaponsSystem.camera then
 			if type(WeaponsSystem.camera.setEnabled) == "function" then
 				WeaponsSystem.camera:setEnabled(hasWeaponEquipped)
@@ -45,36 +87,45 @@ local function setupWeaponsSystem()
 			end
 		end
 
-		-- Apagamos/Prendemos la mira (Crosshair) y los disparos
-		if WeaponsSystem.gui then
-			if type(WeaponsSystem.gui.setEnabled) == "function" then
-				WeaponsSystem.gui:setEnabled(hasWeaponEquipped)
-			else
-				WeaponsSystem.gui.Enabled = hasWeaponEquipped
+		-- La mira requiere arma interna activa, no solo un Tool en la mano.
+		if hasActiveWeapon then
+			setWeaponGuiEnabled(true)
+			if WeaponsSystem.camera and type(WeaponsSystem.camera.updateZoomState) == "function" then
+				WeaponsSystem.camera:updateZoomState()
 			end
+		else
+			forceDisableWeaponGui()
 		end
 
-		-- ??? PARCHE POV: Regresamos los ojos a la cabeza y reseteamos el ancla
+		-- PARCHE POV: Regresamos los ojos a la cabeza y reseteamos el ancla.
 		if not hasWeaponEquipped then
-			if hum then 
-				hum.CameraOffset = Vector3.new(0, 0, 0) 
+			if hum then
+				hum.CameraOffset = Vector3.new(0, 0, 0)
 				workspace.CurrentCamera.CameraSubject = hum
 			end
 			workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		end
-
 	end
 
-	-- ¡Forzamos a apagar la cámara en el instante que la compras!
 	updateCamera()
 
-	-- ?? ESCUCHAMOS EL ATRIBUTO: Si el pájaro lo agarra o lo suelta, forzamos actualización
 	player:GetAttributeChangedSignal("Secuestrado"):Connect(updateCamera)
 
-	-- Detectar cuando equipa (ChildAdded) o guarda (ChildRemoved) el arma
+	if WeaponsSystem.CurrentWeaponChanged then
+		WeaponsSystem.CurrentWeaponChanged.Event:Connect(function()
+			updateCamera()
+			task.defer(updateCamera)
+		end)
+	end
+
 	player.CharacterAdded:Connect(function(char)
 		char.ChildAdded:Connect(updateCamera)
 		char.ChildRemoved:Connect(updateCamera)
+		task.defer(updateCamera)
+	end)
+
+	player.CharacterRemoving:Connect(function()
+		forceDisableWeaponGui()
 	end)
 
 	if player.Character then
