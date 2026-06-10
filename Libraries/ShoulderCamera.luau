@@ -19,6 +19,10 @@ local GameSettings = Settings.GameSettings
 
 local CAMERA_RENDERSTEP_NAME = "ShoulderCameraUpdate"
 local ZOOM_ACTION_NAME = "ShoulderCameraZoom"
+local FIRST_PERSON_PREVIEW = true
+local FIRST_PERSON_FOV = 78
+local FIRST_PERSON_CAMERA_OFFSET = Vector3.new(0, 0.15, -0.35)
+local FIRST_PERSON_FOCUS_DISTANCE = 100
 local CONTROLLABLE_HUMANOID_STATES = {
 	[Enum.HumanoidStateType.Running] = true,
 	[Enum.HumanoidStateType.RunningNoPhysics] = true,
@@ -222,6 +226,8 @@ function ShoulderCamera.new(weaponsSystem)
 	self.defaultRightShoulderC0 = nil
 	self.defaultLeftShoulderC0 = nil
 	self.rootJointC0ReadOnly = false
+	self.firstPersonPreviewActive = false
+	self.previousCameraMode = nil
 	self.random = Random.new()
 
 	return self
@@ -283,6 +289,7 @@ function ShoulderCamera:setEnabled(enabled)
 			self.currentCamera.CameraType = Enum.CameraType.Custom
 		end
 
+		self:setFirstPersonPreviewActive(false)
 		self:setAiming(false)
 		self:releaseFullPose(1)
 		self:updateZoomState()
@@ -352,6 +359,7 @@ function ShoulderCamera:setCameraControlEnabled(enabled)
 end
 
 function ShoulderCamera:applyReleasedControlState()
+	self:setFirstPersonPreviewActive(false)
 	self.zoomedFromInput = false
 	self.forcedZoomed = false
 	self.zoomState = false
@@ -399,6 +407,104 @@ function ShoulderCamera:applyReleasedControlState()
 	UserInputService.MouseIconEnabled = true
 end
 
+function ShoulderCamera:isFirstPersonPreviewActive()
+	return FIRST_PERSON_PREVIEW and
+		self.enabled and
+		self.cameraControlEnabled and
+		self.currentTool ~= nil and
+		self.weaponsSystem and
+		self.weaponsSystem.currentWeapon ~= nil and
+		self.currentHumanoid and
+		self.currentHumanoid.Health > 0
+end
+
+function ShoulderCamera:setFirstPersonPreviewActive(active)
+	active = active and FIRST_PERSON_PREVIEW
+	if self.firstPersonPreviewActive == active then
+		return
+	end
+
+	self.firstPersonPreviewActive = active
+
+	if active then
+		if LocalPlayer then
+			self.previousCameraMode = LocalPlayer.CameraMode
+			pcall(function()
+				LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+			end)
+		end
+	else
+		if LocalPlayer and self.previousCameraMode then
+			local previousCameraMode = self.previousCameraMode
+			pcall(function()
+				LocalPlayer.CameraMode = previousCameraMode
+			end)
+		end
+		self.previousCameraMode = nil
+		self:restoreFirstPersonLocalTransparency()
+	end
+end
+
+function ShoulderCamera:restoreFirstPersonLocalTransparency()
+	if not self.currentCharacter then
+		return
+	end
+
+	for _, descendant in ipairs(self.currentCharacter:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.LocalTransparencyModifier = 0
+		end
+	end
+end
+
+function ShoulderCamera:updateMouseLockState()
+	if self.mouseLocked and not GuiService:GetEmotesMenuOpen() then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
+	else
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+	end
+end
+
+function ShoulderCamera:renderFirstPersonPreview(dt)
+	self:updateMouseLockState()
+	self:processGamepadInput(dt)
+
+	if self.walkSpeedOverrideActive then
+		self.desiredWalkSpeed = self.walkSpeedOverrideTarget
+		self:enforceWalkSpeedOverride()
+	end
+
+	local head = self.currentCharacter and self.currentCharacter:FindFirstChild("Head")
+	local cameraPosition = head and head.Position or (self.currentRootPart.Position + Vector3.new(0, 1.5, 0))
+	local yawRotation = CFrame.Angles(0, self.yaw, 0)
+	local pitchRotation = CFrame.Angles(self.pitch + self.currentRecoil.Y, 0, 0)
+	local cameraCFrame = CFrame.new(cameraPosition) * yawRotation * pitchRotation * CFrame.new(FIRST_PERSON_CAMERA_OFFSET)
+
+	self.currentCFrame = cameraCFrame
+	self.currentCamera.CameraType = Enum.CameraType.Scriptable
+	self.currentCamera.CameraSubject = self.currentRootPart
+	self.currentCamera.CFrame = cameraCFrame
+	self.currentCamera.Focus = cameraCFrame + (cameraCFrame.LookVector * FIRST_PERSON_FOCUS_DISTANCE)
+	self.currentCamera.FieldOfView = FIRST_PERSON_FOV
+	self.desiredFieldOfView = FIRST_PERSON_FOV
+
+	self.currentRecoil = self.currentRecoil - (self.currentRecoil * self.recoilDecay * dt)
+
+	if self:isHumanoidControllable() then
+		self.currentHumanoid.AutoRotate = false
+		self.currentRootPart.CFrame = CFrame.Angles(0, self.yaw, 0) + self.currentRootPart.Position
+		self:applyRootJointFix()
+	else
+		self.currentHumanoid.AutoRotate = true
+	end
+
+	self:updateArmPose(dt)
+	self:handlePartTransparencies()
+	self:handleTouchToolFiring()
+end
+
 function ShoulderCamera:onRenderStep(dt)
 	if not self.enabled or
 	   not self.currentCamera or
@@ -420,14 +526,15 @@ function ShoulderCamera:onRenderStep(dt)
 		return
 	end
 
-	-- Hide mouse and lock to center if applicable
-	if self.mouseLocked and not GuiService:GetEmotesMenuOpen() then
-		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-		UserInputService.MouseIconEnabled = false
-	else
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		UserInputService.MouseIconEnabled = true
+	if self:isFirstPersonPreviewActive() then
+		self:setFirstPersonPreviewActive(true)
+		self:renderFirstPersonPreview(dt)
+		return
 	end
+	self:setFirstPersonPreviewActive(false)
+
+	-- Hide mouse and lock to center if applicable
+	self:updateMouseLockState()
 
 	-- Handle gamepad input
 	self:processGamepadInput(dt)
@@ -826,6 +933,7 @@ function ShoulderCamera:onCurrentCharacterChanged(character)
 		self.currentTool = character:FindFirstChildOfClass("Tool")
 
 		self.eventConnections.humanoidDied = self.currentHumanoid.Died:Connect(function()
+			self:setFirstPersonPreviewActive(false)
 			self.zoomedFromInput = false
 			self:updateZoomState()
 		end)
@@ -838,6 +946,9 @@ function ShoulderCamera:onCurrentCharacterChanged(character)
 		self.eventConnections.characterChildRemoved = character.ChildRemoved:Connect(function(child)
 			if child:IsA("Tool") and self.currentTool == child then
 				self.currentTool = character:FindFirstChildOfClass("Tool")
+				if not self.currentTool then
+					self:setFirstPersonPreviewActive(false)
+				end
 				self:updateZoomState()
 			end
 		end)
@@ -902,6 +1013,7 @@ function ShoulderCamera:onCurrentCharacterChanged(character)
 		end
 
 		self:setAiming(false)
+		self:setFirstPersonPreviewActive(false)
 		self.currentUnarmedWalkSpeed = self.unarmedWalkSpeed
 		self.currentTool = nil
 		self.currentHumanoid = nil
@@ -1003,20 +1115,24 @@ end
 function ShoulderCamera:handlePartTransparencies()
 	local partsLookup = {}
 	local accoutrementsLookup = {}
+	local firstPersonPreviewActive = self:isFirstPersonPreviewActive()
 
 	for _, child in pairs(self.currentCharacter:GetChildren()) do
 		local hidden = false
 		if child:IsA("BasePart") then
-			hidden = partsLookup[child.Name] == true
+			hidden = partsLookup[child.Name] == true or (firstPersonPreviewActive and child.Name == "Head")
 			child.LocalTransparencyModifier = hidden and 1 or 0
 		elseif child:IsA("Accoutrement") then
 			local descendants = child:GetDescendants()
 			local accoutrementParts = {}
+			if firstPersonPreviewActive then
+				hidden = true
+			end
 			for _, desc in pairs(descendants) do
-				if desc:IsA("Attachment") and accoutrementsLookup[desc.Name] then
-					hidden = true
-				elseif desc:IsA("BasePart") then
+				if desc:IsA("BasePart") then
 					table.insert(accoutrementParts, desc)
+				elseif desc:IsA("Attachment") and accoutrementsLookup[desc.Name] then
+					hidden = true
 				end
 			end
 			for _, part in pairs(accoutrementParts) do
