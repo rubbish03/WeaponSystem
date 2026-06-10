@@ -416,6 +416,12 @@ function WeaponsSystem.setWeaponEquipped(weapon, equipped)
 			WeaponsSystem.gui:setCrosshairWeaponScale(WeaponsSystem.currentWeapon:getConfigValue("CrosshairScale", 1))
 		else
 			WeaponsSystem.gui:setCrosshairWeaponScale(1)
+			if WeaponsSystem.gui.setCrosshairEnabled then
+				WeaponsSystem.gui:setCrosshairEnabled(false)
+			end
+			if WeaponsSystem.gui.setScopeEnabled then
+				WeaponsSystem.gui:setScopeEnabled(false)
+			end
 		end
 	end
 

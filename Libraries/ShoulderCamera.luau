@@ -1074,7 +1074,8 @@ function ShoulderCamera:updateZoomState()
 		isZoomed = self.zoomedFromInput
 	end
 
-	if not self.enabled or not self.cameraControlEnabled or not self.currentTool then
+	local hasActiveWeapon = self.enabled and self.cameraControlEnabled and self.currentTool ~= nil and self.weaponsSystem and self.weaponsSystem.currentWeapon ~= nil
+	if not hasActiveWeapon then
 		isZoomed = false
 	end
 
@@ -1086,8 +1087,8 @@ function ShoulderCamera:updateZoomState()
 
 	if self.weaponsSystem and self.weaponsSystem.gui then
 		self.weaponsSystem.gui:setCrosshairScaleTarget(self.zoomState and self.zoomedCrosshairScale or self.normalCrosshairScale)
-		self.weaponsSystem.gui:setCrosshairEnabled(not self.zoomState or not self.hasScope)
-		self.weaponsSystem.gui:setScopeEnabled(self.zoomState and self.hasScope)
+		self.weaponsSystem.gui:setCrosshairEnabled(hasActiveWeapon and (not self.zoomState or not self.hasScope))
+		self.weaponsSystem.gui:setScopeEnabled(hasActiveWeapon and self.zoomState and self.hasScope)
 		if self.currentTool then
 			self.currentTool.ManualActivationOnly = self.zoomState and self.hasScope and UserInputService.TouchEnabled
 		end
