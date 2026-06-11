@@ -22,7 +22,19 @@ local ZOOM_ACTION_NAME = "ShoulderCameraZoom"
 local FIRST_PERSON_PREVIEW = true
 local FIRST_PERSON_FOV = 78
 local FIRST_PERSON_CAMERA_OFFSET = Vector3.new(0, 0.15, -0.35)
+local FIRST_PERSON_AIM_CAMERA_OFFSET = Vector3.new(0.18, 0, -0.35)
+local FIRST_PERSON_AIM_OFFSET_LERP_SPEED = 12
 local FIRST_PERSON_FOCUS_DISTANCE = 100
+local FIRST_PERSON_LEFT_ARM_PARTS = {
+	LeftHand = true,
+	LeftLowerArm = true,
+	LeftUpperArm = true,
+}
+local FIRST_PERSON_PISTOL_NAME_HINTS = {
+	"pistol",
+	"handgun",
+	"revolver",
+}
 local CONTROLLABLE_HUMANOID_STATES = {
 	[Enum.HumanoidStateType.Running] = true,
 	[Enum.HumanoidStateType.RunningNoPhysics] = true,
@@ -227,6 +239,7 @@ function ShoulderCamera.new(weaponsSystem)
 	self.defaultLeftShoulderC0 = nil
 	self.rootJointC0ReadOnly = false
 	self.firstPersonPreviewActive = false
+	self.currentFirstPersonCameraOffset = FIRST_PERSON_CAMERA_OFFSET
 	self.previousCameraMode = nil
 	self.random = Random.new()
 
@@ -441,6 +454,7 @@ function ShoulderCamera:setFirstPersonPreviewActive(active)
 			end)
 		end
 		self.previousCameraMode = nil
+		self.currentFirstPersonCameraOffset = FIRST_PERSON_CAMERA_OFFSET
 		self:restoreFirstPersonLocalTransparency()
 	end
 end
@@ -455,6 +469,58 @@ function ShoulderCamera:restoreFirstPersonLocalTransparency()
 			descendant.LocalTransparencyModifier = 0
 		end
 	end
+end
+
+function ShoulderCamera:getCurrentWeaponConfigValue(valueName, defaultValue)
+	local currentWeapon = self.weaponsSystem and self.weaponsSystem.currentWeapon
+	if currentWeapon and type(currentWeapon.getConfigValue) == "function" then
+		return currentWeapon:getConfigValue(valueName, defaultValue)
+	end
+
+	return defaultValue
+end
+
+function ShoulderCamera:doesTextLookLikePistol(text)
+	if typeof(text) ~= "string" then
+		return false
+	end
+
+	local lowerText = string.lower(text)
+	for _, hint in ipairs(FIRST_PERSON_PISTOL_NAME_HINTS) do
+		if string.find(lowerText, hint, 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function ShoulderCamera:shouldHideLeftArmInFirstPerson()
+	if not self:isFirstPersonPreviewActive() then
+		return false
+	end
+
+	local explicitHide = self:getCurrentWeaponConfigValue("HideLeftArmInFirstPerson", nil)
+	if typeof(explicitHide) == "boolean" then
+		return explicitHide
+	end
+
+	local oneHanded = self:getCurrentWeaponConfigValue("OneHanded", nil)
+	if typeof(oneHanded) == "boolean" then
+		return oneHanded
+	end
+
+	local weaponClass = self:getCurrentWeaponConfigValue("WeaponClass", nil)
+	if self:doesTextLookLikePistol(weaponClass) then
+		return true
+	end
+
+	local weaponCategory = self:getCurrentWeaponConfigValue("WeaponCategory", nil)
+	if self:doesTextLookLikePistol(weaponCategory) then
+		return true
+	end
+
+	return self.currentTool and self:doesTextLookLikePistol(self.currentTool.Name)
 end
 
 function ShoulderCamera:updateMouseLockState()
@@ -480,7 +546,10 @@ function ShoulderCamera:renderFirstPersonPreview(dt)
 	local cameraPosition = head and head.Position or (self.currentRootPart.Position + Vector3.new(0, 1.5, 0))
 	local yawRotation = CFrame.Angles(0, self.yaw, 0)
 	local pitchRotation = CFrame.Angles(self.pitch + self.currentRecoil.Y, 0, 0)
-	local cameraCFrame = CFrame.new(cameraPosition) * yawRotation * pitchRotation * CFrame.new(FIRST_PERSON_CAMERA_OFFSET)
+	local targetOffset = self.zoomState and FIRST_PERSON_AIM_CAMERA_OFFSET or FIRST_PERSON_CAMERA_OFFSET
+	local offsetAlpha = math.clamp(dt * FIRST_PERSON_AIM_OFFSET_LERP_SPEED, 0, 1)
+	self.currentFirstPersonCameraOffset = self.currentFirstPersonCameraOffset:Lerp(targetOffset, offsetAlpha)
+	local cameraCFrame = CFrame.new(cameraPosition) * yawRotation * pitchRotation * CFrame.new(self.currentFirstPersonCameraOffset)
 
 	self.currentCFrame = cameraCFrame
 	self.currentCamera.CameraType = Enum.CameraType.Scriptable
@@ -1116,11 +1185,14 @@ function ShoulderCamera:handlePartTransparencies()
 	local partsLookup = {}
 	local accoutrementsLookup = {}
 	local firstPersonPreviewActive = self:isFirstPersonPreviewActive()
+	local hideLeftArm = self:shouldHideLeftArmInFirstPerson()
 
 	for _, child in pairs(self.currentCharacter:GetChildren()) do
 		local hidden = false
 		if child:IsA("BasePart") then
-			hidden = partsLookup[child.Name] == true or (firstPersonPreviewActive and child.Name == "Head")
+			hidden = partsLookup[child.Name] == true or
+				(firstPersonPreviewActive and child.Name == "Head") or
+				(hideLeftArm and FIRST_PERSON_LEFT_ARM_PARTS[child.Name])
 			child.LocalTransparencyModifier = hidden and 1 or 0
 		elseif child:IsA("Accoutrement") then
 			local descendants = child:GetDescendants()
